@@ -62,14 +62,17 @@ public class Rook : Piece
 	}
 
     public override bool isAttackingSquare(Vector2Int coords) {
-        return canMoveThere(coords);
+        if (coords != this.occupiedSquare && (coords.x - this.occupiedSquare.x == 0 | coords.y - this.occupiedSquare.y == 0)) {
+            return true;
+        }
+        return false;
     }
 
     public override void MovePiece(Vector2Int coords)
 	{
         if (this.getTeam() == controller.getActivePlayer().getTeam())
         {
-            if ((coords.x - this.occupiedSquare.x == 0 | coords.y - this.occupiedSquare.y == 0) && canMoveThere(coords))
+            if (coords != this.occupiedSquare && (coords.x - this.occupiedSquare.x == 0 | coords.y - this.occupiedSquare.y == 0) && canMoveThere(coords))
             {
                 Piece pieceCheck = board.getPiece(coords);
                 if (pieceCheck)

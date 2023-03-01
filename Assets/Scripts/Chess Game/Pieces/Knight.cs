@@ -33,7 +33,15 @@ public class Knight : Piece
 	}
 
 	public override bool isAttackingSquare(Vector2Int coords) {
-        return canMoveThere(coords);
+       Vector2Int displacement = coords - this.occupiedSquare;
+	   for (int i = 0; i < offsets.Length; i++)
+			{
+				if (offsets[i] == displacement)
+				{
+					return true;
+				}
+			}
+		return false;
     }
 
 	public override void MovePiece(Vector2Int coords)

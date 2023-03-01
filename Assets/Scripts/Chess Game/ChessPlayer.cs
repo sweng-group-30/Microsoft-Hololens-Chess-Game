@@ -10,11 +10,14 @@ public class ChessPlayer
 	public List<Piece> activePieces { get; private set; }
     public List<Piece> takenPieces { get; private set; } // pieces the player has taken from other team
 
+	public King king{get;set;}
+
 	public ChessPlayer(TeamColor team, Board board)
 	{
 		activePieces = new List<Piece>();
 		this.board = board;
 		this.team = team;
+		this.king = null;
 	}
     public void AddPiece(Piece piece)
 	{
@@ -26,6 +29,14 @@ public class ChessPlayer
 	{
 		if (activePieces.Contains(piece))
 			activePieces.Remove(piece);
+	}
+
+	public King getKing() {
+		return this.king;
+	}
+
+	public void setKing(King k) {
+		this.king = k;
 	}
 
     public TeamColor getTeam() {

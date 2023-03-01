@@ -38,7 +38,15 @@ public class Pawn : Piece, IMixedRealityPointerHandler
     }
 
     public override bool isAttackingSquare(Vector2Int coords) {
-        return canPawnTake(coords);
+        int xPos = this.occupiedSquare.x;
+        int yPos = this.occupiedSquare.y;
+        Vector2Int displacement = new Vector2Int(xPos, yPos);
+        displacement = coords - displacement;
+        
+        if ((displacement.x == 1 || displacement.x == -1) && (displacement.y == -1)) {
+                return true;
+            }
+            return false;
     }
     public override void MovePiece(Vector2Int coords)
     {

@@ -70,31 +70,41 @@ public class Bishop : Piece
     }
 
     public override bool isAttackingSquare(Vector2Int coords) {
-        return canMoveThere(coords);
+        Vector2Int displacement = coords - this.occupiedSquare;
+        if (coords != this.occupiedSquare && System.Math.Abs(displacement.x) == System.Math.Abs(displacement.y)) {
+            return true;
+        }
+        return false;
     }
 
     public override void MovePiece(Vector2Int coords)
     {
         if (this.getTeam() == controller.getActivePlayer().getTeam())
         {
-            Vector2Int displacement = coords - this.occupiedSquare;
+            if (mustMoveKing()) {
+                // King is in check, snap back to current square
+                transform.position = this.board.CalculatePositionFromCoords(this.occupiedSquare);
+                Debug.Log("Must move king!");
+            } else {
+                Vector2Int displacement = coords - this.occupiedSquare;
             
 
-            if (coords != this.occupiedSquare && System.Math.Abs(displacement.x) == System.Math.Abs(displacement.y) && canMoveThere(coords))
-            {
-                Piece pieceCheck = board.getPiece(coords);
-                if (pieceCheck)
+                if (coords != this.occupiedSquare && System.Math.Abs(displacement.x) == System.Math.Abs(displacement.y) && canMoveThere(coords))
                 {
-                    board.takePiece(this, coords);
+                    Piece pieceCheck = board.getPiece(coords);
+                    if (pieceCheck)
+                    {
+                        board.takePiece(this, coords);
+                    }
+                    this.occupiedSquare = coords;
+                    transform.position = this.board.CalculatePositionFromCoords(coords);
+                    controller.endTurn();
+                    //moved = true;
                 }
-                this.occupiedSquare = coords;
-                transform.position = this.board.CalculatePositionFromCoords(coords);
-                controller.endTurn();
-                //moved = true;
-            }
-            else
-            {
-                transform.position = this.board.CalculatePositionFromCoords(this.occupiedSquare);
+                else
+                {
+                    transform.position = this.board.CalculatePositionFromCoords(this.occupiedSquare);
+                }
             }
         } else
         {

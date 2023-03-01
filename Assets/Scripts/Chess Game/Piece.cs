@@ -18,7 +18,7 @@ public abstract class Piece : MonoBehaviour, IMixedRealityPointerHandler
 	public TeamColor team { get; set; }
 	public bool hasMoved { get; set; }
 	public List<Vector2Int> avaliableMoves;
-
+	
 	public ChessGameController controller {get; set;}
 
 	public abstract List<Vector2Int> SelectAvaliableSquares();
@@ -99,4 +99,20 @@ public abstract class Piece : MonoBehaviour, IMixedRealityPointerHandler
     {
         Debug.Log("click");
     }
+
+	public bool mustMoveKing() {
+		if (this.team == TeamColor.White) {
+			King k = this.controller.whitePlayer.getKing();
+			if (k.isInCheckAtCoords(k.occupiedSquare)){
+				return true;
+			}
+			return false;
+		} else {
+			King k = this.controller.blackPlayer.getKing();
+			if (k.isInCheckAtCoords(k.occupiedSquare)){
+				return true;
+			}
+			return false;
+		}
+	}
 }

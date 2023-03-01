@@ -87,7 +87,18 @@ public class Queen : Piece
 	}
 
     public override bool isAttackingSquare(Vector2Int coords) {
-        return canMoveThere(coords);
+        foreach (var direction in directions)
+            {
+                for (int i = 1; i < 20; i++)
+                //for(int i = 1;i<board.size;i++)
+                {
+                    if ((coords == this.occupiedSquare + direction * i))
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
     }
 
     public override void MovePiece(Vector2Int coords)

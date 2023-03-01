@@ -20,6 +20,9 @@ public class King : Piece
     }
 
     public bool canMoveThere(Vector2Int coords) {
+        if (isInCheckAtCoords(coords)) {
+            return false;
+        }
 		Piece temp = board.getPiece(coords);
         if (temp && temp != this) {
             if (temp.IsFromSameTeam(this)) {
@@ -31,7 +34,20 @@ public class King : Piece
 	}
 
     public override bool isAttackingSquare(Vector2Int coords) {
-        return canMoveThere(coords);
+        if (coords.x - this.occupiedSquare.x <= 1 && coords.x - this.occupiedSquare.x >= -1 &&
+             coords.y - this.occupiedSquare.y <= 1 && coords.y - this.occupiedSquare.y >= -1) {
+                return true;
+        }
+            return false;
+    }
+
+    public bool isInCheckAtCoords(Vector2Int coords){
+        foreach (Piece p in this.controller.getOpposingPlayer(this.team).activePieces) {
+            if (p.isAttackingSquare(coords)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public override void MovePiece(Vector2Int coords)

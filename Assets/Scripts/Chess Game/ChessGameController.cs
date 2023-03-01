@@ -13,9 +13,9 @@ public class ChessGameController : MonoBehaviour
     private PieceCreator pieceCreator;
     public Piece[] activePieces = new Piece[32];
 
-    private ChessPlayer whitePlayer;
-    private ChessPlayer blackPlayer;
-    private ChessPlayer activePlayer{get; set;}    
+    public ChessPlayer whitePlayer{get;set;}
+    public ChessPlayer blackPlayer{get;set;}
+    public ChessPlayer activePlayer{get; set;}    
 
     private void Awake()
     {
@@ -51,6 +51,13 @@ public class ChessGameController : MonoBehaviour
         blackPlayer = new ChessPlayer(TeamColor.Black, board);
     }
 
+    public ChessPlayer getOpposingPlayer(TeamColor c) {
+        if (c == TeamColor.White) {
+            return this.blackPlayer;
+        } else {
+            return this.whitePlayer;
+        }
+    }
 
     private void CreatePiecesFromLayout(BoardLayout layout)
     {
@@ -59,13 +66,12 @@ public class ChessGameController : MonoBehaviour
             Vector2Int squareCoords = layout.GetSquareCoordsAtIndex(i);
             TeamColor team = layout.GetSquareTeamColorAtIndex(i);
             string typeName = layout.GetSquarePieceNameAtIndex(i);
-
             Type type = Type.GetType(typeName);
-            CreatePieceAndInitialize(squareCoords, team, type);
+            CreatePieceAndInitialize(squareCoords, team, type, layout);
         }
     }
 
-    private void CreatePieceAndInitialize(Vector2Int squareCoords, TeamColor team, Type type)
+    private void CreatePieceAndInitialize(Vector2Int squareCoords, TeamColor team, Type type, BoardLayout layout)
     {
         
         Piece newPiece = pieceCreator.CreatePiece(type).GetComponent<Piece>();
@@ -107,8 +113,14 @@ public class ChessGameController : MonoBehaviour
 
         if (newPiece.getTeam() == TeamColor.White) {
             whitePlayer.AddPiece(newPiece);
+            if (type.ToString() == "King") {
+                whitePlayer.setKing((King)newPiece);
+            }
         } else {
             blackPlayer.AddPiece(newPiece);
+            if (type.ToString() == "King") {
+                blackPlayer.setKing((King)newPiece);
+            }
         }
 
         Material teamMaterial = pieceCreator.GetTeamMaterial(team);
