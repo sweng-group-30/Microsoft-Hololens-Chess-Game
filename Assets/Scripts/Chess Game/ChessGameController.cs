@@ -4,31 +4,45 @@ using System.Collections.Generic;
 using UnityEngine;
 using Microsoft.MixedReality.Toolkit.Input;
 using Microsoft.MixedReality.Toolkit.UI;
+using TMPro;
+using UnityEngine.InputSystem.XR;
 using Photon.Pun;
 using Photon.Realtime;
 
 [RequireComponent(typeof(PieceCreator))]
-public class ChessGameController : MonoBehaviour//, IPunObservable
+public class ChessGameController : MonoBehaviour
 {
     [SerializeField] private BoardLayout startingBoardLayout;
     [SerializeField] private Board board;
+    [SerializeField] private Material red;
+    //[SerializeField] private Material black;
+    //[SerializeField] private Material white;
     private PieceCreator pieceCreator;
     public Piece[] activePieces = new Piece[32];
+    public TurnIndicator turnIndicator;
+    public bool hasCaptured;
+    public SinglePlayer ai;
+
 
     private Piece blackKing;
     private Piece whiteKing;
     private Piece checkedKing;
+    public Piece currentKing;
+    public bool isSinglePlayer = false; //triggers on and off single player mode
     public ChessPlayer whitePlayer{get; set;}
     public ChessPlayer blackPlayer{get; set;}
     private ChessPlayer activePlayer{get; set;}
 
     private PhotonView photonView;
 
+
     private void Awake()
     {
+        isSinglePlayer = false;
         SetDependencies();
         CreatePlayers();
         photonView = gameObject.GetComponent<PhotonView>();
+
     }
 
     private void SetDependencies()
@@ -39,24 +53,27 @@ public class ChessGameController : MonoBehaviour//, IPunObservable
     // Start is called before the first frame update
     void Start()
     {
-        //StartNewGame();
+        Debug.Log(isSinglePlayer);
+        if (isSinglePlayer)
+        {
+            StartNewGame();
+        }
     }
 
-    private void StartNewGame()
+     private void StartNewGame()
     {
         CreatePiecesFromLayout(startingBoardLayout);
         board.SetDependencies(this);
         activePlayer = whitePlayer;
+        turnIndicator.SetDependencies(this);
+        //AudioManager.instance.Play("start");
+        ai = new SinglePlayer();
     }
 
     public void StartNetworkGame()
     {
         NetworkCreatePieces(startingBoardLayout);
-        
-    }
 
-    public ChessPlayer getActivePlayer() {
-        return activePlayer;
     }
 
     public String getActivePlayerString()
@@ -66,6 +83,11 @@ public class ChessGameController : MonoBehaviour//, IPunObservable
             return "whitePlayer";
         }
         else return "blackPlayer";
+    }
+
+
+    public ChessPlayer getActivePlayer() {
+        return activePlayer;
     }
 
     public ChessPlayer getBlackPlayer() {
@@ -100,6 +122,7 @@ public class ChessGameController : MonoBehaviour//, IPunObservable
     {
         board.SetDependencies(this);
         activePlayer = whitePlayer;
+        isSinglePlayer = false;
 
         Piece piece = chessPiece.GetComponent<Piece>();
         TeamColor team = startingBoardLayout.GetSquareTeamColorAtIndex(layoutIndex);
@@ -125,15 +148,13 @@ public class ChessGameController : MonoBehaviour//, IPunObservable
             Vector2Int squareCoords = layout.GetSquareCoordsAtIndex(i);
             TeamColor team = layout.GetSquareTeamColorAtIndex(i);
             string typeName = layout.GetSquarePieceNameAtIndex(i);
-            
 
             Type type = Type.GetType(typeName);
             CreatePieceAndInitialize(squareCoords, team, type);
         }
     }
 
-
-    private void CreatePieceAndInitialize(Vector2Int squareCoords, TeamColor team, Type type)
+    public void CreatePieceAndInitialize(Vector2Int squareCoords, TeamColor team, Type type)
     {
         Piece newPiece = pieceCreator.CreatePiece(type).GetComponent<Piece>();
 
@@ -185,6 +206,20 @@ public class ChessGameController : MonoBehaviour//, IPunObservable
         );
     }
 
+    public void initailzeActivePieces(Piece piece)
+    {
+
+        for (int i = 0; i < 32; i++)
+        {
+            if (this.activePieces[i] == null)
+            {
+                //Debug.Log("Pieces have been set.");
+                this.activePieces[i] = piece;
+                break;
+            }
+        }
+    }
+
     private void assignTeam(Piece newPiece, TeamColor team)
     {
         if (newPiece.getTeam() == TeamColor.White)
@@ -204,25 +239,15 @@ public class ChessGameController : MonoBehaviour//, IPunObservable
         }
     }
 
-    public void initailzeActivePieces(Piece piece)
+    public void recordPieceRemoval(Piece taken)
     {
-
-        for (int i = 0; i < 32; i++)
+        if (taken.getTeam() == TeamColor.White)
         {
-            if (this.activePieces[i] == null)
-                {
-                    Debug.Log("Pieces have been set.");
-                    this.activePieces[i] = piece;
-                    break;
-                }
-        }
-    }
-
-    public void recordPieceRemoval(Piece taken) {
-        if (taken.getTeam() == TeamColor.White) {
             blackPlayer.AddToTakenPieces(taken);
             whitePlayer.RemovePiece(taken);
-        } else {
+        }
+        else
+        {
             whitePlayer.AddToTakenPieces(taken);
             blackPlayer.RemovePiece(taken);
         }
@@ -242,37 +267,97 @@ public class ChessGameController : MonoBehaviour//, IPunObservable
 
     }
 
-    public void endTurn() {
+    public void endTurn()
+    {
         // Swap active player
-        if (getActivePlayer().kingInCheck) {
+        if (getActivePlayer().kingInCheck)
+        {
             // player managed to get themselves out of check
             Debug.Log("Succesfully moved out of check");
             getActivePlayer().kingInCheck = false;
+            Material teamMaterial = pieceCreator.GetTeamMaterial(activePlayer.team);
+            checkedKing.SetMaterial(teamMaterial);
             checkedKing = null;
         }
-        if (getActivePlayer() == whitePlayer) {
+
+        if (getActivePlayer() == whitePlayer)
+        {
             activePlayer = blackPlayer;
-        } else if (getActivePlayer() == blackPlayer) {
+            foreach (Piece p in blackPlayer.activePieces)
+            {
+                if (p.typeName == "Pawn")
+                {
+                    Pawn pawnref = (Pawn)p;
+                    pawnref.movedTwoSquares = false;
+                }
+            }
+            turnIndicator.ColourTeam();
+            if (isSinglePlayer) // if true allows single player moves to take place. AI is always blackPlayer
+            {
+                ai.getComputerMove("h6", activePieces);
+            }
+        }
+        else if (getActivePlayer() == blackPlayer)
+        {
             activePlayer = whitePlayer;
+            foreach (Piece p in whitePlayer.activePieces)
+            {
+                if (p.typeName == "Pawn")
+                {
+                    Pawn pawnref = (Pawn)p;
+                    pawnref.movedTwoSquares = false;
+                }
+            }
+            turnIndicator.ColourTeam();
         }
         if (photonView != null && PhotonNetwork.PlayerList.Length >= 2)
         {
             photonView.RPC("UpdateNetworkTurn", RpcTarget.All, getActivePlayerString());
         }
-        if (checkCond()) {
+        if (checkCond())
+        {
             Debug.Log("Check");
             activePlayer.kingInCheck = true;
+            bool checkMate = isGameOver();
+            if (!checkMate)
+            {
+                AudioManager.instance.Play("check");
+            }
+            else
+                AudioManager.instance.Play("checkmate");
+        }
+        else if (hasCaptured)
+        {
+            AudioManager.instance.Play("capture");
+        }
+        if (checkStaleMate())
+        {
             isGameOver();
         }
 
         // Debug
-        if (getActivePlayer() == whitePlayer) {
-            Debug.Log("White");
-        } else {
-            Debug.Log("Black");
+        if (getActivePlayer() == whitePlayer)
+        {
+            //Debug.Log("White");
         }
+        else
+        {
+            //Debug.Log("Black");
+        }
+        hasCaptured = false;
 
-        
+        /*
+        if(activePlayer.kingInCheck == true)
+        {
+            checkedKing.SetMaterial(red);
+        }
+        else
+        {
+            Material teamMaterial = pieceCreator.GetTeamMaterial(activePlayer.team);
+            checkedKing.SetMaterial(teamMaterial);
+        }
+        */
+
     }
 
     [PunRPC]
@@ -292,6 +377,7 @@ public class ChessGameController : MonoBehaviour//, IPunObservable
         {
             activePlayer = whitePlayer;
         }
+        
     }
 
     private void NetworkUpdatePlayer(string activePlayerString)
@@ -306,8 +392,18 @@ public class ChessGameController : MonoBehaviour//, IPunObservable
     public bool checkCond()                     // Evaluates check condition return true if checked else false
     {
         ChessPlayer otherPlayer;
-        whiteKing = activePieces[4];
-        blackKing = activePieces[20];
+        whiteKing = null;
+        blackKing = null;
+        foreach (Piece p in whitePlayer.activePieces) {
+            if (p.typeName == "King") {
+                whiteKing = p;
+            }
+        }
+        foreach (Piece p in blackPlayer.activePieces) {
+            if (p.typeName == "King") {
+                blackKing = p;
+            }
+        }
         if (activePlayer == whitePlayer)
         {
             checkedKing = whiteKing;
@@ -323,10 +419,11 @@ public class ChessGameController : MonoBehaviour//, IPunObservable
         {
             Piece piece = otherPlayer.activePieces[i];
             piece.PossibleMoves();
-            for (int z = 0; z < piece.avaliableMoves.Count; z++)
+            for (int z = 0; z < piece.availableMoves.Count; z++)
             {
-                if (piece.avaliableMoves[z] == checkedKing.occupiedSquare)
+                if (piece.availableMoves[z] == checkedKing.occupiedSquare)
                 {
+
                     return true;
                 }
             }
@@ -336,35 +433,92 @@ public class ChessGameController : MonoBehaviour//, IPunObservable
         return false;
     }
 
-    public bool isGameOver() {
+    public bool checkStaleMate()                                                // evaluates stalemate condition return true if so else false
+    {
+        ChessPlayer otherPlayer;
+        whiteKing = activePieces[4];
+        blackKing = activePieces[20];
+        if (activePlayer == whitePlayer)
+        {
+            currentKing = whiteKing;
+            otherPlayer = blackPlayer;
+        }
+        else
+        {
+            currentKing = blackKing;
+            otherPlayer = whitePlayer;
+        }
+        for(int x =0; x< activePlayer.activePieces.Count; x++)                  // if pieces other than king have available moves, return 
+        {                                                                       // false, stalemate condition not satisfied
+            if (activePlayer.activePieces[x] != currentKing)
+            {
+                activePlayer.activePieces[x].PossibleMoves();
+                if (activePlayer.activePieces[x].availableMoves.Count != 0)
+                {
+                    return false;
+                }
+            }
+        }
+        for(int i =0; i < otherPlayer.activePieces.Count; i++)                  // if any move of King is available (without running into check condition)
+        {
+            
+            Piece piece = otherPlayer.activePieces[i];
+            piece.PossibleMoves();
+            currentKing.PossibleMoves();
+            for (int j = 0; j < currentKing.availableMoves.Count; j++)     
+            {
+                bool notOccupied = true;
+                for (int k = 0; k < piece.availableMoves.Count; k++)
+                {
+                    if (currentKing.availableMoves[j] == piece.availableMoves[k])
+                    {
+                        notOccupied = false;
+                    }
+                }
+                if (notOccupied) return false;
+            }
+            
+        }
+        return true;
+    }
+
+    public bool isGameOver()
+    {
         foreach (Piece p in activePlayer.activePieces)
         {
             p.PossibleMoves();
             p.removeMovesLeavingKingInCheck();
-            if (p.avaliableMoves.Count != 0) {
+            if (p.availableMoves.Count != 0)
+            {
                 return false;
             }
         }
-        if (activePlayer.kingInCheck) {
+        if (activePlayer.kingInCheck)
+        {
             Debug.Log("Checkmate");
-        } else {
+        }
+        else
+        {
             Debug.Log("Stalemate");
         }
         return true;
     }
-    /**
-    public void OnPhotonSerializeView(PhotonStream stream, PhotonMessageInfo info)
+
+    public bool checkmate()
     {
-        if (stream.IsWriting)
+        foreach (Piece p in activePlayer.activePieces)
         {
-            stream.SendNext(getActivePlayerString());
-            //Debug.Log("Sending activePlayer = " + getActivePlayerString());
+            p.PossibleMoves();
+            p.removeMovesLeavingKingInCheck();
+            if (p.availableMoves.Count != 0)
+            {
+                return false;
+            }
         }
-        else if (stream.IsReading)
+        if (activePlayer.kingInCheck)
         {
-            //Debug.Log("Current activePlayer = " + getActivePlayerString());
-            NetworkUpdatePlayer((string)stream.ReceiveNext());
-            //Debug.Log("Updated activePlayer = " + getActivePlayerString());
+            return true;
         }
-    }*/
+        else return false;
+    }
 }
